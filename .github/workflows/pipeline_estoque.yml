@@ -98,6 +98,10 @@ jobs:
               dados = []
 
           op = '$OP'
+          arg_nome = sys.argv[1]
+          arg_qtd = sys.argv[2]
+          arg_valor = sys.argv[3]
+          arg_id = sys.argv[4]
           msg_resumo = ''
 
           if op == 'ADICIONAR':
@@ -111,16 +115,16 @@ jobs:
 
               novo_item = {
                   'id': novo_id,
-                  'nome': '$NOME',
-                  'quantidade': int('$QTD' if '$QTD' != '' else 0),
-                  'valor': float('$VALOR' if '$VALOR' != '' else 0.0)
+                  'nome': arg_nome,
+                  'quantidade': int(arg_qtd if arg_qtd != '' else 0),
+                  'valor': float(arg_valor if arg_valor != '' else 0.0)
               }
               dados.append(novo_item)
               dados = sorted(dados, key=lambda x: x['id'])
-              msg_resumo = f'Item cadastrado com sucesso. ID: {novo_id} | Nome: $NOME'
+              msg_resumo = f'Item cadastrado com sucesso. ID: {novo_id} | Nome: {arg_nome}'
 
           elif op == 'REMOVER':
-              target_id = int('$ID_ITEM')
+              target_id = int(arg_id if arg_id != '' else 0)
               removido = False
               novos_dados = []
               for item in dados:
@@ -135,12 +139,12 @@ jobs:
                   sys.exit(1)
 
           elif op == 'ATUALIZAR':
-              target_id = int('$ID_ITEM')
+              target_id = int(arg_id if arg_id != '' else 0)
               atualizado = False
               for item in dados:
                   if item['id'] == target_id:
-                      item['quantidade'] = int('$QTD')
-                      item['valor'] = float('$VALOR')
+                      item['quantidade'] = int(arg_qtd if arg_qtd != '' else 0)
+                      item['valor'] = float(arg_valor if arg_valor != '' else 0.0)
                       atualizado = True
                       msg_resumo = f'Item ID {target_id} atualizado para Qtd: {item[\"quantidade\"]} e Valor: R$ {item[\"valor\"]:.2f}'
                       break
@@ -148,18 +152,19 @@ jobs:
                   print(f'Erro: ID {target_id} nao encontrado.')
                   sys.exit(1)
 
-          with open('estoque.json', 'w') as f:
-              json.dump(dados, f, indent=2)
+          # Salvando com ensure_ascii=False para manter os acentos corretos no JSON
+          with open('estoque.json', 'w', encoding='utf-8') as f:
+              json.dump(dados, f, indent=2, ensure_ascii=False)
 
-          with open(sys.argv[1], 'a') as summary:
+          with open(sys.argv[5], 'a', encoding='utf-8') as summary:
               summary.write('## Relatorio de Deploy em Producao\n')
               summary.write(f'{msg_resumo}\n\n')
-              summary.write('Ultimos Itens no Estoque Atualizado\n')
+              summary.write('### Ultimos Itens no Estoque Atualizado\n')
               summary.write('| ID | Nome | Quantidade | Valor (R$) |\n')
               summary.write('|---|---|---|---|\n')
               for item in dados[-5:]:
                   summary.write(f\"| {item['id']} | {item['nome']} | {item['quantidade']} | R$ {item['valor']:.2f} |\n\")
-          " "$GITHUB_STEP_SUMMARY"
+          " "$NOME" "$QTD" "$VALOR" "$ID_ITEM" "$GITHUB_STEP_SUMMARY"
 
       - name: Salvar
         run: |
