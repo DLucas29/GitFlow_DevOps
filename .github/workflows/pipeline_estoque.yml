@@ -154,7 +154,7 @@ jobs:
           with open(sys.argv[1], 'a') as summary:
               summary.write('## Relatorio de Deploy em Producao\n')
               summary.write(f'{msg_resumo}\n\n')
-              summary.write('### Ultimos Itens no Estoque Atualizado\n')
+              summary.write('Ultimos Itens no Estoque Atualizado\n')
               summary.write('| ID | Nome | Quantidade | Valor (R$) |\n')
               summary.write('|---|---|---|---|\n')
               for item in dados[-5:]:
