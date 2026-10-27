@@ -1,0 +1,183 @@
+name: Pipeline CI/CD - Sistema de Estoque
+
+on:
+  workflow_dispatch:
+    inputs:
+      operacao:
+        description: 'Selecione a Operacao'
+        required: true
+        type: choice
+        options:
+          - ADICIONAR
+          - REMOVER
+          - ATUALIZAR
+      nome:
+        description: 'Nome do Item (Apenas para ADICIONAR)'
+        required: false
+        type: string
+      id_item:
+        description: 'ID do Item (Para REMOVER ou ATUALIZAR)'
+        required: false
+        type: number
+      quantidade:
+        description: 'Quantidade (Para ADICIONAR ou ATUALIZAR)'
+        required: false
+        type: number
+      valor:
+        description: 'Valor R$ (Para ADICIONAR ou ATUALIZAR)'
+        required: false
+        type: number
+
+jobs:
+  build:
+    name: Stage Build e Validacao
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Validar Integridade do JSON e Arquivos
+        run: |
+          echo "### Relatorio de Build" >> $GITHUB_STEP_SUMMARY
+          if python3 -c "import json; json.load(open('estoque.json'))"; then
+            echo "**Build Status:** Sucesso! O arquivo estoque.json esta valido." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Build Status:** Falha no parser do JSON!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  test:
+    name: Stage Testes Unitarios
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Codigo
+        uses: actions/checkout@v4
+
+      - name: Executar Testes com Unittest
+        run: |
+          echo "### Relatorio de Testes" >> $GITHUB_STEP_SUMMARY
+          if python3 -m unittest test_estoque.py; then
+            echo "**Test Status:** Todos os testes unitarios passaram." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Test Status:** Falha nos testes de regressao." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  deploy:
+    name: Stage Deploy e Atualizacao
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Executar Operacao no Estoque
+        shell: bash
+        run: |
+          OP="${{ github.event.inputs.operacao }}"
+          NOME="${{ github.event.inputs.nome }}"
+          ID_ITEM="${{ github.event.inputs.id_item }}"
+          QTD="${{ github.event.inputs.quantidade }}"
+          VALOR="${{ github.event.inputs.valor }}"
+
+          python3 -c "
+          import json, sys
+
+          try:
+              with open('estoque.json', 'r') as f:
+                  dados = json.load(f)
+          except:
+              dados = []
+
+          op = '$OP'
+          msg_resumo = ''
+
+          if op == 'ADICIONAR':
+              ids_existentes = sorted([item['id'] for item in dados])
+              novo_id = 1
+              for id_atual in ids_existentes:
+                  if id_atual == novo_id:
+                      novo_id += 1
+                  else:
+                      break
+
+              novo_item = {
+                  'id': novo_id,
+                  'nome': '$NOME',
+                  'quantidade': int('$QTD' if '$QTD' != '' else 0),
+                  'valor': float('$VALOR' if '$VALOR' != '' else 0.0)
+              }
+              dados.append(novo_item)
+              dados = sorted(dados, key=lambda x: x['id'])
+              msg_resumo = f'Item cadastrado com sucesso. ID: {novo_id} | Nome: $NOME'
+
+          elif op == 'REMOVER':
+              target_id = int('$ID_ITEM')
+              removido = False
+              novos_dados = []
+              for item in dados:
+                  if item['id'] == target_id:
+                      removido = True
+                      msg_resumo = f\"Item '{item['nome']}' (ID: {target_id}) removido. ID liberado para reuso.\"
+                  else:
+                      novos_dados.append(item)
+              dados = novos_dados
+              if not removido:
+                  print(f'Erro: ID {target_id} nao encontrado.')
+                  sys.exit(1)
+
+          elif op == 'ATUALIZAR':
+              target_id = int('$ID_ITEM')
+              atualizado = False
+              for item in dados:
+                  if item['id'] == target_id:
+                      item['quantidade'] = int('$QTD')
+                      item['valor'] = float('$VALOR')
+                      atualizado = True
+                      msg_resumo = f'Item ID {target_id} atualizado para Qtd: {item[\"quantidade\"]} e Valor: R$ {item[\"valor\"]:.2f}'
+                      break
+              if not atualizado:
+                  print(f'Erro: ID {target_id} nao encontrado.')
+                  sys.exit(1)
+
+          with open('estoque.json', 'w') as f:
+              json.dump(dados, f, indent=2)
+
+          with open(sys.argv[1], 'a') as summary:
+              summary.write('## Relatorio de Deploy em Producao\n')
+              summary.write(f'{msg_resumo}\n\n')
+              summary.write('### Ultimos Itens no Estoque Atualizado\n')
+              summary.write('| ID | Nome | Quantidade | Valor (R$) |\n')
+              summary.write('|---|---|---|---|\n')
+              for item in dados[-5:]:
+                  summary.write(f\"| {item['id']} | {item['nome']} | {item['quantidade']} | R$ {item['valor']:.2f} |\n\")
+          " "$GITHUB_STEP_SUMMARY"
+
+      - name: Salvar no Repositorio Commit Dinamico
+        run: |
+          git config user.name "DLucas29"
+          git config user.email "davilima7002@gmailcom"
+          
+          git add estoque.json
+          
+          if git rev-parse --verify HEAD >/dev/null 2>&1; then
+            ultimo_autor=$(git log -1 --pretty=format:'%an')
+            if [ "$ultimo_autor" = "DLucas29" ]; then
+              git commit --amend -m "Estoque atualizado via pipeline"
+              git push origin HEAD --force-with-lease
+            else
+              git commit -m "Estoque atualizado via pipeline"
+              git push origin HEAD
+            fi
+          else
+            git commit -m "Estoque atualizado via pipeline"
+            git push origin HEAD
+          fi
