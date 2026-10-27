@@ -171,13 +171,13 @@ jobs:
           if git rev-parse --verify HEAD >/dev/null 2>&1; then
             ultimo_autor=$(git log -1 --pretty=format:'%an')
             if [ "$ultimo_autor" = "DLucas29" ]; then
-              git commit --amend -m "Estoque atualizado via pipeline"
+              git commit --amend -m "update/Estoque-atualizado"
               git push origin HEAD --force-with-lease
             else
-              git commit -m "Estoque atualizado via pipeline"
+              git commit -m "update/Estoque-atualizado"
               git push origin HEAD
             fi
           else
-            git commit -m "Estoque atualizado via pipeline"
+            git commit -m "update/Estoque-atualizado"
             git push origin HEAD
           fi
