@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "id": 1,
+    "nome": "Batata Doce",
+    "quantidade": 5,
+    "valor": 7.0
+  }
+]
