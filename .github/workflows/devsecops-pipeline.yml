@@ -51,7 +51,7 @@ jobs:
           nohup npm start > app.log 2>&1 &
           npx wait-on http://localhost:3000/api/status -t 15000
 
-      - name: Executar OWASP ZAP Baseline Scan (Modo Docker Nativo)
+      - name: Executar OWASP ZAP Baseline Scan
         run: |
           mkdir -p zap-reports
           chmod 777 zap-reports
