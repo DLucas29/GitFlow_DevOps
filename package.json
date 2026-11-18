@@ -1,7 +1,7 @@
 {
   "name": "gitflow-devops",
   "version": "1.0.0",
-  "description": "Projeto prático de CI/CD com SAST e DAST",
+  "description": "Projeto CI/CD com SAST e DAST",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
